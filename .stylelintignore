@@ -1,0 +1,4 @@
+src/styles/tailwind.css
+src/styles/theme.css
+node_modules/
+dist/
