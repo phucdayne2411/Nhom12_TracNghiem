@@ -5,7 +5,7 @@ import { api } from '../context/auth-context';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { ArrowLeft, Clock, FileText, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Clock, FileText, AlertCircle, CheckCircle2, Loader2, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function WaitingRoomPage() {
