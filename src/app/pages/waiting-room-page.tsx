@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-// Sử dụng api instance từ context để đồng bộ Token
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import { Badge } from '../components/ui/badge'; 
 import { ArrowLeft, Clock, FileText, AlertCircle, CheckCircle2, Loader2, BookOpen } from 'lucide-react';
 import { toast } from 'sonner';
 
