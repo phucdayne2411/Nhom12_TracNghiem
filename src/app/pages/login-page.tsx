@@ -99,7 +99,6 @@ export function LoginPage() {
                 <Input
                   id="email"
                   type="text"
-                  placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   disabled={isSubmitting}
@@ -159,10 +158,6 @@ export function LoginPage() {
             </form>
           </CardContent>
         </Card>
-
-        <p className="text-center text-sm text-gray-500">
-          © 2026 UIT Exam System. Bảo mật và chính xác.
-        </p>
       </div>
     </div>
   );
