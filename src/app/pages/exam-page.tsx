@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 // Sử dụng api instance từ context để tự động đính kèm Token
 import { api } from '../context/auth-context'; 
 import { Button } from '../components/ui/button';
