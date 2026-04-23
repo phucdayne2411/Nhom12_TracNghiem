@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-// Sử dụng instance api chung để tự động xử lý Token
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
