@@ -5,8 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Search, Download, Trash2, Loader2, FileSpreadsheet } from 'lucide-react';
+import { Search, Trash2, Loader2, FileSpreadsheet } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Import thư viện Excel
+import * as XLSX from 'xlsx';
 
 interface ResultData {
   id: number;
@@ -33,7 +36,6 @@ export function ResultsManagement() {
         params: { search: searchQuery }
       });
       
-      // Mapping dữ liệu từ BE sang FE nếu cần (đảm bảo đúng tên trường)
       const mappedData = response.data.map((item: any) => ({
         id: item.id,
         studentName: item.user?.name || item.studentName || 'N/A',
@@ -54,7 +56,6 @@ export function ResultsManagement() {
     }
   };
 
-  // Áp dụng Debounce cho ô tìm kiếm: Đợi 500ms sau khi ngừng gõ mới gọi API
   useEffect(() => {
     const delayDebounceFn = setTimeout(() => {
       fetchResults(searchTerm);
@@ -73,7 +74,7 @@ export function ResultsManagement() {
       setIsSubmitting(true);
       await api.delete(`/admin/results/${id}`);
       toast.success('Đã xóa kết quả thành công');
-      fetchResults(searchTerm); // Tải lại danh sách
+      fetchResults(searchTerm);
     } catch (error: any) {
       toast.error('Lỗi khi xóa kết quả');
     } finally {
@@ -81,10 +82,56 @@ export function ResultsManagement() {
     }
   };
 
-  // 3. XUẤT EXCEL (Giả lập hoặc gọi endpoint BE)
+  // 3. XUẤT EXCEL TỪ DỮ LIỆU FRONTEND
   const handleExport = () => {
-    toast.info('Hệ thống đang chuẩn bị tệp Excel, vui lòng đợi...');
-    // Phục có thể dùng thư viện xlsx hoặc gọi endpoint: window.open('https://onlineexambe.onrender.com/api/admin/results/export')
+    if (results.length === 0) {
+      toast.warning('Không có dữ liệu để xuất Excel!');
+      return;
+    }
+
+    toast.info('Đang chuẩn bị file Excel...');
+
+    try {
+      // 3.1. Chuyển đổi dữ liệu sang dạng phẳng (phù hợp với bảng)
+      const exportData = results.map((result, index) => ({
+        'STT': index + 1,
+        'Họ và Tên': result.studentName,
+        'Email': result.studentEmail,
+        'Tên bài thi': result.examName,
+        'Môn học': typeof result.subject === 'object' ? (result.subject?.name || 'N/A') : result.subject,
+        'Điểm số (Thang 100)': result.score,
+        'Số câu đúng': result.total_correct,
+        'Thời gian nộp bài': new Date(result.completedAt).toLocaleString('vi-VN')
+      }));
+
+      // 3.2. Tạo Worksheet
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+
+      // Căn chỉnh độ rộng các cột trong Excel cho đẹp
+      worksheet['!cols'] = [
+        { wch: 5 },   // STT
+        { wch: 25 },  // Tên
+        { wch: 30 },  // Email
+        { wch: 35 },  // Bài thi
+        { wch: 25 },  // Môn học
+        { wch: 18 },  // Điểm
+        { wch: 15 },  // Số câu đúng
+        { wch: 25 },  // Thời gian
+      ];
+
+      // 3.3. Tạo Workbook và đính kèm Worksheet
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả thi");
+
+      // 3.4. Xuất file tự động tải xuống máy người dùng
+      const fileName = `Ket_Qua_Thi_${new Date().getTime()}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      toast.success('Xuất file Excel thành công!');
+    } catch (error) {
+      console.error("Lỗi xuất Excel:", error);
+      toast.error('Có lỗi xảy ra khi xuất file!');
+    }
   };
 
   return (
@@ -95,7 +142,11 @@ export function ResultsManagement() {
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Quản lý Kết quả</h1>
           <p className="text-gray-500 mt-1">Theo dõi điểm số và thống kê chi tiết của sinh viên</p>
         </div>
-        <Button variant="outline" onClick={handleExport} className="gap-2 border-green-600 text-green-700 hover:bg-green-50">
+        <Button 
+          variant="outline" 
+          onClick={handleExport} 
+          className="gap-2 border-green-600 text-green-700 hover:bg-green-50"
+        >
           <FileSpreadsheet className="h-4 w-4" /> Xuất Excel
         </Button>
       </div>
