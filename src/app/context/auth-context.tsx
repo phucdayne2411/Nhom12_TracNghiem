@@ -7,6 +7,7 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  withCredentials: true,
 });
 
 export { api };
@@ -43,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Interceptor tự động gắn Token vào mọi request gửi đi
     const interceptor = api.interceptors.request.use((config) => {
       const currentToken = localStorage.getItem('token');
+      config.headers = config.headers ?? {};
       if (currentToken) {
         config.headers.Authorization = `Bearer ${currentToken}`;
       }
