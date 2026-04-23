@@ -100,7 +100,7 @@ export function StudentDashboard() {
                 <div className="flex justify-between items-start mb-2">
                   <h4 className="font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{exam.name}</h4>
                 </div>
-                <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-4">{exam.subject}</p>
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-4">{exam.subject || exam.subject_name || 'N/A'}</p>
                 
                 <div className="space-y-2 mb-5">
                   <div className="flex items-center gap-2 text-[13px] text-gray-500">
