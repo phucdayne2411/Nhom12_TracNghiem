@@ -85,52 +85,52 @@ export function ResultsManagement() {
   // 3. XUẤT EXCEL TỪ DỮ LIỆU FRONTEND
   const handleExport = () => {
     if (results.length === 0) {
-      toast.warning('Không có dữ liệu để xuất Excel!');
+      toast.warning('Không có dữ liệu kết quả để xuất Excel!');
       return;
     }
 
-    toast.info('Đang chuẩn bị file Excel...');
+    toast.info('Đang chuẩn bị file Excel, vui lòng đợi...');
 
     try {
-      // 3.1. Chuyển đổi dữ liệu sang dạng phẳng (phù hợp với bảng)
+      // 3.1. Format lại dữ liệu để hiển thị đẹp trong Excel (Đổi tên cột tiếng Việt)
       const exportData = results.map((result, index) => ({
         'STT': index + 1,
         'Họ và Tên': result.studentName,
         'Email': result.studentEmail,
         'Tên bài thi': result.examName,
         'Môn học': typeof result.subject === 'object' ? (result.subject?.name || 'N/A') : result.subject,
-        'Điểm số (Thang 100)': result.score,
+        'Điểm số': result.score,
         'Số câu đúng': result.total_correct,
-        'Thời gian nộp bài': new Date(result.completedAt).toLocaleString('vi-VN')
+        'Ngày nộp bài': new Date(result.completedAt).toLocaleString('vi-VN')
       }));
 
-      // 3.2. Tạo Worksheet
+      // 3.2. Tạo Worksheet (Bảng tính) từ dữ liệu đã format
       const worksheet = XLSX.utils.json_to_sheet(exportData);
 
-      // Căn chỉnh độ rộng các cột trong Excel cho đẹp
+      // Chỉnh độ rộng các cột cho dễ nhìn
       worksheet['!cols'] = [
         { wch: 5 },   // STT
-        { wch: 25 },  // Tên
+        { wch: 25 },  // Họ tên
         { wch: 30 },  // Email
-        { wch: 35 },  // Bài thi
+        { wch: 35 },  // Tên bài thi
         { wch: 25 },  // Môn học
-        { wch: 18 },  // Điểm
+        { wch: 10 },  // Điểm
         { wch: 15 },  // Số câu đúng
-        { wch: 25 },  // Thời gian
+        { wch: 25 },  // Ngày nộp
       ];
 
-      // 3.3. Tạo Workbook và đính kèm Worksheet
+      // 3.3. Tạo Workbook (File Excel) và gắn bảng tính vào
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả thi");
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Kết quả sinh viên");
 
-      // 3.4. Xuất file tự động tải xuống máy người dùng
+      // 3.4. Xuất file và kích hoạt tải xuống
       const fileName = `Ket_Qua_Thi_${new Date().getTime()}.xlsx`;
       XLSX.writeFile(workbook, fileName);
 
       toast.success('Xuất file Excel thành công!');
     } catch (error) {
-      console.error("Lỗi xuất Excel:", error);
-      toast.error('Có lỗi xảy ra khi xuất file!');
+      console.error("Lỗi khi xuất Excel:", error);
+      toast.error('Có lỗi xảy ra trong quá trình tạo file Excel');
     }
   };
 
