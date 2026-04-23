@@ -56,7 +56,7 @@ export function SubjectsManagement() {
     fetchSubjects();
   }, []);
 
-  // 2. Xử lý Thêm hoặc Cập nhật môn học
+  // 2. Xử lý Thêm hoặc Cập nhật môn học thủ công
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -133,7 +133,7 @@ export function SubjectsManagement() {
       return;
     }
 
-    toast.info('Đang đọc file Excel...');
+    toast.info('Đang đọc file Excel và đẩy lên hệ thống...');
     const reader = new FileReader();
 
     reader.onload = async (evt) => {
@@ -148,25 +148,24 @@ export function SubjectsManagement() {
         const data = XLSX.utils.sheet_to_json(ws);
 
         if (data.length === 0) {
-          toast.warning('File Excel trống!');
+          toast.warning('File Excel trống hoặc không đúng định dạng!');
           return;
         }
 
-        console.log("Dữ liệu đọc được từ Excel:", data);
+        // GỌI API BACKEND ĐỂ LƯU VÀO DATABASE
+        await api.post('/admin/subjects/import', { subjects: data });
         
-        // GỌI API BACKEND Ở ĐÂY ĐỂ LƯU VÀO DATABASE
-        // await api.post('/admin/subjects/import', { subjects: data });
-        // toast.success(`Đã nhập thành công ${data.length} môn học!`);
-        // fetchSubjects(); 
-        
-        toast.success(`Đã đọc thành công ${data.length} dòng. Xem Console để thấy dữ liệu.`);
+        toast.success(`Đã nhập thành công môn học từ Excel!`);
+        fetchSubjects(); // Tải lại danh sách môn học ngay lập tức
 
-      } catch (error) {
-        console.error('Lỗi đọc file Excel:', error);
-        toast.error('Có lỗi xảy ra khi xử lý file Excel');
+      } catch (error: any) {
+        console.error('Lỗi import Excel:', error);
+        const errorMsg = error.response?.data?.message || 'Có lỗi xảy ra khi xử lý file Excel. Vui lòng kiểm tra lại kết nối hoặc định dạng file.';
+        toast.error(errorMsg);
       } finally {
         setIsSubmitting(false);
-        if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+        // Reset input để người dùng có thể chọn lại chính file đó nếu cần
+        if (fileInputRef.current) fileInputRef.current.value = ''; 
       }
     };
 
