@@ -95,15 +95,21 @@ export function ExamPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Gửi mảng các câu trả lời lên server
-      await api.post(`/student/exams/${examId}/submit`, {
-        answers: answers 
-      });
-      toast.success("Nộp bài thành công!");
+      const token = localStorage.getItem('token');
+      const response = await api.post(
+        `/student/exams/${examId}/submit`,
+        { answers },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      );
+
+      toast.success(response.data.message || "Nộp bài thành công!");
       navigate(`/student/result/${examId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Lỗi nộp bài:", error);
-      toast.error("Lỗi khi gửi bài làm. Vui lòng kiểm tra kết nối!");
+      const message = error?.response?.data?.message || error?.message || "Lỗi khi gửi bài làm. Vui lòng kiểm tra kết nối!";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
       setShowSubmitDialog(false);
