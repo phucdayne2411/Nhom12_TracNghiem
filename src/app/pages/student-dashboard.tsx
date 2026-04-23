@@ -11,7 +11,8 @@ import { toast } from 'sonner';
 interface Exam {
   id: number;
   name: string;
-  subject: string;
+  subject: any; // Sửa từ string thành any để linh hoạt nhận Object từ API
+  subject_name?: string; // Thêm trường này nếu API có trả về
   start_time: string;
   end_time: string;
   duration: number;
@@ -100,7 +101,11 @@ export function StudentDashboard() {
                 <div className="flex justify-between items-start mb-2">
                   <h4 className="font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{exam.name}</h4>
                 </div>
-                <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-4">{exam.subject || exam.subject_name || 'N/A'}</p>
+                
+                {/* Đã sửa lỗi Render Object ở đây */}
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-4">
+                  {typeof exam.subject === 'object' ? exam.subject?.name : (exam.subject || exam.subject_name || 'N/A')}
+                </p>
                 
                 <div className="space-y-2 mb-5">
                   <div className="flex items-center gap-2 text-[13px] text-gray-500">
