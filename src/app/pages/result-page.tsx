@@ -61,7 +61,7 @@ export function ResultPage() {
   const totalQuestions = resultData.total_questions || 0;
   const wrongCount = totalQuestions - correctCount;
   const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
-  const subjectName = resultData.subject_name || resultData.subject || 'N/A';
+  const subjectName = resultData.subject_name || resultData.subject?.name || resultData.subject || 'N/A';
   const durationMinutes = resultData.duration || resultData.duration_minutes || '--';
   const finishedAt = resultData.completed_at || resultData.submitted_at || resultData.created_at;
 
