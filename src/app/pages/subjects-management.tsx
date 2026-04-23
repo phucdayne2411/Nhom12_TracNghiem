@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 // Sử dụng instance api chung để tự động xử lý Token
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -8,8 +8,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
-import { Plus, Search, Edit, Trash2, Loader2, BookOpen } from 'lucide-react';
+import { Plus, Search, Edit, Trash2, Loader2, BookOpen, Upload } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Import thư viện Excel
+import * as XLSX from 'xlsx';
 
 interface Subject {
   id: number;
@@ -32,11 +35,13 @@ export function SubjectsManagement() {
     description: ''
   });
 
+  // Tham chiếu đến thẻ input file ẩn
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // 1. Tải danh sách môn học từ Backend Render
   const fetchSubjects = async () => {
     try {
       setLoading(true);
-      // Gọi trực tiếp, Token đã được tự động gắn bởi interceptor trong auth-context
       const response = await api.get('/admin/subjects');
       setSubjects(response.data);
     } catch (error: any) {
@@ -113,6 +118,61 @@ export function SubjectsManagement() {
     setEditingSubject(null);
   };
 
+  // 3. Xử lý IMPORT EXCEL
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    if (fileExt !== 'xlsx' && fileExt !== 'xls') {
+      toast.error('Vui lòng chọn file Excel định dạng .xlsx hoặc .xls');
+      return;
+    }
+
+    toast.info('Đang đọc file Excel...');
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        setIsSubmitting(true);
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          toast.warning('File Excel trống!');
+          return;
+        }
+
+        console.log("Dữ liệu đọc được từ Excel:", data);
+        
+        // GỌI API BACKEND Ở ĐÂY ĐỂ LƯU VÀO DATABASE
+        // await api.post('/admin/subjects/import', { subjects: data });
+        // toast.success(`Đã nhập thành công ${data.length} môn học!`);
+        // fetchSubjects(); 
+        
+        toast.success(`Đã đọc thành công ${data.length} dòng. Xem Console để thấy dữ liệu.`);
+
+      } catch (error) {
+        console.error('Lỗi đọc file Excel:', error);
+        toast.error('Có lỗi xảy ra khi xử lý file Excel');
+      } finally {
+        setIsSubmitting(false);
+        if (fileInputRef.current) fileInputRef.current.value = ''; // Reset input
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
   const filteredSubjects = subjects.filter(subject =>
     subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (subject.description && subject.description.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -120,24 +180,45 @@ export function SubjectsManagement() {
 
   return (
     <div className="p-6 lg:p-8 space-y-6 animate-in fade-in duration-500">
+      {/* Input ẩn để chọn file Excel */}
+      <input 
+        type="file" 
+        accept=".xlsx, .xls" 
+        ref={fileInputRef} 
+        onChange={handleFileUpload} 
+        className="hidden" 
+      />
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Quản lý môn học</h1>
           <p className="text-gray-500 mt-1">Quản lý danh mục các môn học trong hệ thống thi</p>
         </div>
-        <Button
-          className="gap-2 bg-blue-600 hover:bg-blue-700 shadow-md transition-all active:scale-95"
-          type="button"
-          onClick={() => {
-            resetForm();
-            setIsAddDialogOpen(true);
-          }}
-          disabled={isSubmitting}
-        >
-          <Plus className="w-4 h-4" />
-          Thêm môn học mới
-        </Button>
+        
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="gap-2 bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+            onClick={handleImportClick}
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import Excel
+          </Button>
+
+          <Button
+            className="gap-2 bg-blue-600 hover:bg-blue-700 shadow-md transition-all active:scale-95"
+            onClick={() => {
+              resetForm();
+              setIsAddDialogOpen(true);
+            }}
+            disabled={isSubmitting}
+          >
+            <Plus className="w-4 h-4" />
+            Thêm môn học mới
+          </Button>
+        </div>
       </div>
 
       {/* Search Bar Section */}
