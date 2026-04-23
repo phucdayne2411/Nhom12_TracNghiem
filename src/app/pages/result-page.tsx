@@ -61,6 +61,9 @@ export function ResultPage() {
   const totalQuestions = resultData.total_questions || 0;
   const wrongCount = totalQuestions - correctCount;
   const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+  const subjectName = resultData.subject_name || resultData.subject || 'N/A';
+  const durationMinutes = resultData.duration || resultData.duration_minutes || '--';
+  const finishedAt = resultData.completed_at || resultData.submitted_at || resultData.created_at;
 
   const getScoreGrade = (s: number) => {
     if (s >= 80) return { label: 'Xuất sắc', color: 'bg-green-500' };
@@ -133,7 +136,7 @@ export function ResultPage() {
                   <span>Ngày hoàn thành:</span>
                 </div>
                 <span className="font-semibold text-gray-800">
-                  {new Date(resultData.completed_at || resultData.created_at).toLocaleString('vi-VN')}
+                  {finishedAt ? new Date(finishedAt).toLocaleString('vi-VN') : 'Chưa có'}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -141,7 +144,7 @@ export function ResultPage() {
                   <Clock className="h-4 w-4" />
                   <span>Thời gian làm bài:</span>
                 </div>
-                <span className="font-semibold text-gray-800">{resultData.duration || '--'} phút</span>
+                <span className="font-semibold text-gray-800">{durationMinutes} phút</span>
               </div>
             </div>
           </CardContent>
@@ -169,7 +172,7 @@ export function ResultPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-xs text-gray-500 font-bold uppercase mb-1">Môn học</p>
-                <p className="font-bold text-gray-800">{resultData.subject_name || 'N/A'}</p>
+                <p className="font-bold text-gray-800">{subjectName}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-xs text-gray-500 font-bold uppercase mb-1">Trạng thái bài thi</p>
