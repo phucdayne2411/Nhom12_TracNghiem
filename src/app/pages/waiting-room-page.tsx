@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 // Sử dụng api instance từ context để đồng bộ Token
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Alert, AlertDescription } from '../components/ui/alert';
-import { ArrowLeft, Clock, FileText, AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Label } from '../components/ui/label';
+import { ArrowLeft, Clock, FileText, AlertCircle, CheckCircle2, Loader2, BookOpen, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function WaitingRoomPage() {
@@ -16,6 +19,9 @@ export function WaitingRoomPage() {
   const [loading, setLoading] = useState(true);
   const [timeUntilStart, setTimeUntilStart] = useState<number>(0);
   const [canStart, setCanStart] = useState(false);
+  const [password, setPassword] = useState('');
+  const [passwordRequired, setPasswordRequired] = useState(false);
+  const [passwordVerified, setPasswordVerified] = useState(false);
 
   // 1. Tải thông tin bài thi chi tiết từ Backend
   useEffect(() => {
@@ -24,7 +30,17 @@ export function WaitingRoomPage() {
       try {
         setLoading(true);
         const response = await api.get(`/student/exams/${examId}`);
+        
+        // Nếu bài thi đã làm rồi thì đá thẳng sang trang kết quả
+        if (response.data.is_completed) {
+          toast.info("Bạn đã làm bài thi này. Chuyển đến trang kết quả.");
+          navigate(`/student/result/${examId}`, { replace: true });
+          return;
+        }
+
         setExam(response.data);
+        setPasswordRequired(!!response.data.password);
+        setPasswordVerified(!response.data.password); // Nếu không có password thì coi như đã verified
       } catch (error: any) {
         console.error("Lỗi tải thông tin bài thi:", error);
         toast.error("Không tìm thấy thông tin bài thi.");
@@ -34,7 +50,27 @@ export function WaitingRoomPage() {
     };
 
     fetchExamDetail();
-  }, [examId]);
+  }, [examId, navigate]);
+
+  // 3. Hàm xác thực mật khẩu
+  const verifyPassword = async () => {
+    if (!password.trim()) {
+      toast.error('Vui lòng nhập mật khẩu');
+      return;
+    }
+
+    try {
+      const response = await api.get(`/student/exams/${examId}`, {
+        params: { password }
+      });
+      setExam(response.data);
+      setPasswordVerified(true);
+      toast.success('Mật khẩu chính xác!');
+    } catch (error: any) {
+      console.error("Lỗi xác thực mật khẩu:", error);
+      toast.error(error.response?.data?.message || 'Mật khẩu không đúng');
+    }
+  };
 
   // 2. Logic tính toán thời gian đếm ngược
   useEffect(() => {
@@ -114,7 +150,10 @@ export function WaitingRoomPage() {
               <div>
                 <CardTitle className="text-3xl font-bold leading-tight">{exam.name}</CardTitle>
                 <p className="text-blue-100 mt-2 font-medium flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" /> {exam.subject_name || exam.subject}
+                  <BookOpen className="h-4 w-4" />
+                  {typeof exam.subject === 'object'
+                    ? exam.subject?.name || exam.subject_name || 'N/A'
+                    : exam.subject_name || exam.subject || 'N/A'}
                 </p>
               </div>
               <Badge className="bg-white/20 text-white border-none px-4 py-1 text-sm uppercase">Trực tuyến</Badge>
@@ -158,7 +197,38 @@ export function WaitingRoomPage() {
         {/* Action Section */}
         <Card className="shadow-lg border-none">
           <CardContent className="p-10">
-            {!canStart ? (
+            {passwordRequired && !passwordVerified ? (
+              <div className="text-center space-y-6">
+                <div className="h-24 w-24 rounded-full bg-blue-50 flex items-center justify-center mx-auto border-4 border-blue-100">
+                  <Lock className="h-10 w-10 text-blue-500" />
+                </div>
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-bold text-gray-900">Bài thi được bảo vệ</h3>
+                  <p className="text-gray-500">Vui lòng nhập mật khẩu để truy cập bài thi.</p>
+                </div>
+                <div className="max-w-sm mx-auto space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="password" className="text-sm font-medium">Mật khẩu bài thi</Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="Nhập mật khẩu..."
+                      className="text-center text-lg"
+                      onKeyPress={(e) => e.key === 'Enter' && verifyPassword()}
+                    />
+                  </div>
+                  <Button 
+                    size="lg"
+                    className="w-full h-12 font-bold"
+                    onClick={verifyPassword}
+                  >
+                    Xác nhận mật khẩu
+                  </Button>
+                </div>
+              </div>
+            ) : !canStart ? (
               <div className="text-center space-y-6">
                 <div className="h-24 w-24 rounded-full bg-yellow-50 flex items-center justify-center mx-auto border-4 border-yellow-100 animate-pulse">
                   <Clock className="h-10 w-10 text-yellow-500" />

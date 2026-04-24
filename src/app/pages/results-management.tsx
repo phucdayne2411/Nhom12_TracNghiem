@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 // Sử dụng instance api chung để tự động xử lý xác thực
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -81,10 +82,51 @@ export function ResultsManagement() {
     }
   };
 
-  // 3. XUẤT EXCEL (Giả lập hoặc gọi endpoint BE)
+  // 3. XUẤT EXCEL
   const handleExport = () => {
-    toast.info('Hệ thống đang chuẩn bị tệp Excel, vui lòng đợi...');
-    // Phục có thể dùng thư viện xlsx hoặc gọi endpoint: window.open('https://onlineexambe.onrender.com/api/admin/results/export')
+    if (!results.length) {
+      toast.error('Không có dữ liệu để xuất Excel');
+      return;
+    }
+
+    try {
+      const headerRow = [
+        'ID',
+        'Sinh viên',
+        'Email',
+        'Bài thi',
+        'Môn học',
+        'Ngày nộp',
+        'Điểm',
+        'Số câu đúng'
+      ];
+
+      const rows = results.map((item) => [
+        item.id,
+        item.studentName,
+        item.studentEmail,
+        item.examName,
+        typeof item.subject === 'object' ? item.subject.name : item.subject,
+        new Date(item.completedAt).toLocaleString('vi-VN', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        item.score,
+        item.total_correct
+      ]);
+
+      const worksheet = XLSX.utils.aoa_to_sheet([headerRow, ...rows]);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Kết quả');
+      XLSX.writeFile(workbook, `ket-qua-thi_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      toast.success('Tệp Excel đã sẵn sàng tải xuống');
+    } catch (error) {
+      console.error('Lỗi khi xuất Excel:', error);
+      toast.error('Không thể xuất kết quả ra Excel');
+    }
   };
 
   return (

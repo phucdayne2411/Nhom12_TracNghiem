@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 // Sử dụng api instance từ context để lấy dữ liệu thật
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -20,12 +20,14 @@ export function ResultPage() {
       if (!examId) return;
       try {
         setLoading(true);
+        setResultData(null); // Reset data before fetching
         // Gọi API lấy kết quả bài thi cụ thể của sinh viên này
         const response = await api.get(`/student/exams/${examId}/result`);
         setResultData(response.data);
       } catch (error: any) {
         console.error("Lỗi tải kết quả:", error);
         toast.error("Không tìm thấy kết quả thi hoặc bạn chưa hoàn thành bài thi này.");
+        setResultData(null);
       } finally {
         setLoading(false);
       }
@@ -61,6 +63,9 @@ export function ResultPage() {
   const totalQuestions = resultData.total_questions || 0;
   const wrongCount = totalQuestions - correctCount;
   const accuracy = totalQuestions > 0 ? (correctCount / totalQuestions) * 100 : 0;
+  const subjectName = resultData.subject_name || resultData.subject?.name || resultData.subject || 'N/A';
+  const durationMinutes = resultData.duration || resultData.duration_minutes || '--';
+  const finishedAt = resultData.completed_at || resultData.submitted_at || resultData.created_at;
 
   const getScoreGrade = (s: number) => {
     if (s >= 80) return { label: 'Xuất sắc', color: 'bg-green-500' };
@@ -133,7 +138,7 @@ export function ResultPage() {
                   <span>Ngày hoàn thành:</span>
                 </div>
                 <span className="font-semibold text-gray-800">
-                  {new Date(resultData.completed_at || resultData.created_at).toLocaleString('vi-VN')}
+                  {finishedAt ? new Date(finishedAt).toLocaleString('vi-VN') : 'Chưa có'}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
@@ -141,7 +146,7 @@ export function ResultPage() {
                   <Clock className="h-4 w-4" />
                   <span>Thời gian làm bài:</span>
                 </div>
-                <span className="font-semibold text-gray-800">{resultData.duration || '--'} phút</span>
+                <span className="font-semibold text-gray-800">{durationMinutes} phút</span>
               </div>
             </div>
           </CardContent>
@@ -169,7 +174,7 @@ export function ResultPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-xs text-gray-500 font-bold uppercase mb-1">Môn học</p>
-                <p className="font-bold text-gray-800">{resultData.subject_name || 'N/A'}</p>
+                <p className="font-bold text-gray-800">{subjectName}</p>
               </div>
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                 <p className="text-xs text-gray-500 font-bold uppercase mb-1">Trạng thái bài thi</p>
@@ -178,6 +183,75 @@ export function ResultPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Chi tiết câu hỏi và đáp án */}
+        {resultData.questions && resultData.questions.length > 0 && (
+          <Card className="shadow-lg border-none">
+            <CardHeader>
+              <CardTitle className="text-lg">Xem lại bài làm</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {resultData.questions.map((question: any, index: number) => (
+                <div key={question.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                      question.is_correct ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                    }`}>
+                      {index + 1}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-gray-900 mb-3">{question.questionText}</p>
+                      
+                      <div className="space-y-2">
+                        {Object.entries(question.options).map(([key, value]) => {
+                          const isCorrectAnswer = key === question.correct_answer;
+                          const isStudentAnswer = key === question.student_answer;
+                          
+                          return (
+                            <div 
+                              key={key}
+                              className={`p-3 rounded-lg border-2 transition-colors ${
+                                isCorrectAnswer 
+                                  ? 'bg-green-50 border-green-300 text-green-800' 
+                                  : isStudentAnswer && !question.is_correct
+                                    ? 'bg-red-50 border-red-300 text-red-800'
+                                    : 'bg-gray-50 border-gray-200 text-gray-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{key}.</span>
+                                <span>{value as string}</span>
+                                {isCorrectAnswer && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600 ml-auto" />
+                                )}
+                                {isStudentAnswer && !question.is_correct && (
+                                  <XCircle className="h-4 w-4 text-red-600 ml-auto" />
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      
+                      <div className="mt-3 text-sm">
+                        <span className="text-gray-600">Đáp án đúng: </span>
+                        <span className="font-bold text-green-700">{question.correct_answer}</span>
+                        {question.student_answer && (
+                          <>
+                            <span className="text-gray-600 ml-4">Bạn chọn: </span>
+                            <span className={`font-bold ${question.is_correct ? 'text-green-700' : 'text-red-700'}`}>
+                              {question.student_answer}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Nút hành động */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -188,13 +262,6 @@ export function ResultPage() {
             onClick={() => navigate('/student/dashboard')}
           >
             Quay lại trang chủ
-          </Button>
-          <Button 
-            size="lg"
-            className="px-8 font-bold bg-blue-600 hover:bg-blue-700 shadow-md"
-            onClick={() => window.print()}
-          >
-            In kết quả thi
           </Button>
         </div>
       </div>

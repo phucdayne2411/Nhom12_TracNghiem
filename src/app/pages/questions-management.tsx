@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import * as XLSX from 'xlsx';
 // Sử dụng instance api chung để tự động xử lý Token
 import { api } from '../context/auth-context'; 
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -46,6 +47,8 @@ export function QuestionsManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<QuestionItem | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [formData, setFormData] = useState({
     questionText: '',
@@ -57,6 +60,62 @@ export function QuestionsManagement() {
     subjectId: '',
     difficulty: 'medium' as DifficultyValue
   });
+
+  const normalizeHeaderKey = (value: string) => value?.toString().trim().toLowerCase();
+
+  const getMappedKey = (columnName: string) => {
+    const header = normalizeHeaderKey(columnName);
+    const mapping: Record<string, string> = {
+      'nội dung câu hỏi': 'content',
+      'câu hỏi': 'content',
+      'question': 'content',
+      'content': 'content',
+
+      'đáp án a': 'option_a',
+      'a': 'option_a',
+      'option a': 'option_a',
+      'option_a': 'option_a',
+
+      'đáp án b': 'option_b',
+      'b': 'option_b',
+      'option b': 'option_b',
+      'option_b': 'option_b',
+
+      'đáp án c': 'option_c',
+      'c': 'option_c',
+      'option c': 'option_c',
+      'option_c': 'option_c',
+
+      'đáp án d': 'option_d',
+      'd': 'option_d',
+      'option d': 'option_d',
+      'option_d': 'option_d',
+
+      'đáp án đúng': 'correct_answer',
+      'correct answer': 'correct_answer',
+      'correct_answer': 'correct_answer',
+      'đáp án đúng (a/b/c/d)': 'correct_answer',
+
+      'môn học': 'subject_name',
+      'môn học id': 'subject_id',
+      'subject_id': 'subject_id',
+      'subject id': 'subject_id',
+      'subject': 'subject_name',
+
+      'độ khó': 'difficulty',
+      'difficulty': 'difficulty'
+    };
+    return mapping[header] || header;
+  };
+
+  const normalizeRow = (row: Record<string, any>) => {
+    const normalized: Record<string, any> = {};
+    Object.entries(row).forEach(([header, value]) => {
+      const key = getMappedKey(header);
+      normalized[key] = value;
+    });
+    return normalized;
+  };
 
   // 1. Tải danh sách môn học
   const fetchSubjects = async () => {
@@ -144,6 +203,95 @@ export function QuestionsManagement() {
     }
   };
 
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      setIsImporting(true);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!worksheet) {
+        toast.error('Không tìm thấy sheet đầu tiên trong tệp Excel');
+        return;
+      }
+
+      const rawData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: '' });
+      if (!rawData.length) {
+        toast.error('Tệp Excel không có dữ liệu để import');
+        return;
+      }
+
+      const subjectLookup = Object.fromEntries(subjects.map((subject) => [subject.name.toString().trim().toLowerCase(), subject.id]));
+      const createPromises = rawData.map(async (row, index) => {
+        const normalized = normalizeRow(row);
+        const subjectIdValue = normalized.subject_id || normalized.subject_name || normalized.subject;
+        const subjectId = subjectIdValue?.toString().trim();
+        const subjectIdFromName = subjectLookup[subjectId?.toLowerCase() ?? ''];
+        const finalSubjectId = subjectIdFromName || Number(subjectId);
+
+        const payload = {
+          content: normalized.content?.toString() || '',
+          option_a: normalized.option_a?.toString() || '',
+          option_b: normalized.option_b?.toString() || '',
+          option_c: normalized.option_c?.toString() || '',
+          option_d: normalized.option_d?.toString() || '',
+          correct_answer: normalized.correct_answer?.toString().toUpperCase() || '',
+          subject_id: Number(finalSubjectId),
+          difficulty: normalized.difficulty?.toString().toLowerCase() || 'medium'
+        };
+
+        if (!payload.content || !payload.option_a || !payload.option_b || !payload.option_c || !payload.option_d) {
+          throw new Error(`Dòng ${index + 2}: thiếu nội dung câu hỏi hoặc đáp án`);
+        }
+
+        if (!['A', 'B', 'C', 'D'].includes(payload.correct_answer)) {
+          throw new Error(`Dòng ${index + 2}: đáp án đúng phải là A, B, C hoặc D`);
+        }
+
+        if (!payload.subject_id || Number.isNaN(payload.subject_id)) {
+          throw new Error(`Dòng ${index + 2}: thiếu Môn học hoặc Subject ID không hợp lệ`);
+        }
+
+        if (!['easy', 'medium', 'hard'].includes(payload.difficulty)) {
+          throw new Error(`Dòng ${index + 2}: Độ khó phải là easy, medium hoặc hard`);
+        }
+
+        return api.post('/admin/questions', payload);
+      });
+
+      const results = await Promise.allSettled(createPromises);
+      const successful = results.filter((result) => result.status === 'fulfilled').length;
+      const failed = results.filter((result) => result.status === 'rejected');
+
+      if (successful) {
+        toast.success(`Đã import thành công ${successful} câu hỏi`);
+      }
+
+      if (failed.length) {
+        const errorMessage = failed.map((result) => {
+          const reason = (result as PromiseRejectedResult).reason;
+          return reason?.response?.data?.message || reason?.message || 'Lỗi không xác định';
+        }).join('; ');
+        toast.error(`Có ${failed.length} câu hỏi không được import: ${errorMessage}`);
+      }
+
+      fetchQuestions();
+    } catch (error: any) {
+      toast.error(error?.message || 'Lỗi khi import tệp Excel');
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
   const handleEdit = (q: QuestionItem) => {
     setEditingQuestion(q);
     setFormData({
@@ -190,8 +338,17 @@ export function QuestionsManagement() {
           <h1 className="text-3xl font-bold text-gray-900">Ngân hàng câu hỏi</h1>
           <p className="text-gray-500">Quản lý nội dung các câu hỏi trắc nghiệm</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" className="gap-2"><Upload className="h-4 w-4" /> Import</Button>
+        <div className="flex gap-2 items-center">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          <Button variant="outline" className="gap-2" onClick={handleImportClick} disabled={isImporting}>
+            <Upload className="h-4 w-4" /> {isImporting ? 'Đang import...' : 'Import'}
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)} className="gap-2 bg-blue-600 hover:bg-blue-700">
             <Plus className="h-4 w-4" /> Thêm câu hỏi
           </Button>

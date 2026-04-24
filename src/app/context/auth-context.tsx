@@ -3,7 +3,7 @@ import axios from 'axios';
 
 // Cấu hình Instance dùng chung cho toàn bộ dự án
 const api = axios.create({
-  baseURL: 'https://onlineexambe.onrender.com/api',
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -43,6 +43,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Interceptor tự động gắn Token vào mọi request gửi đi
     const interceptor = api.interceptors.request.use((config) => {
       const currentToken = localStorage.getItem('token');
+      config.headers = config.headers ?? {};
       if (currentToken) {
         config.headers.Authorization = `Bearer ${currentToken}`;
       }
@@ -72,9 +73,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
-    try { await api.post('/logout'); } catch (e) {}
+    try { 
+      await api.post('/logout'); 
+    } catch (e) {
+      console.error('Logout API error:', e);
+    }
     setUser(null);
-    localStorage.clear();
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
   };
 
   return (

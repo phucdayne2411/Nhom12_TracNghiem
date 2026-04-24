@@ -69,7 +69,7 @@ export function ExamsManagement() {
         id: String(exam.id),
         name: exam.name,
         subjectId: Number(exam.subject_id),
-        subjectName: exam.subject?.name || 'N/A',
+        subjectName: exam.subject?.name || exam.subject_name || 'N/A',
         startTime: exam.start_time,
         endTime: exam.end_time,
         duration: exam.duration,

@@ -15,6 +15,7 @@ interface UserData {
   name: string;
   email: string;
   role: string;
+  mssv?: string;
   created_at: string;
 }
 
@@ -30,7 +31,8 @@ export function UsersManagement() {
     name: '',
     email: '',
     password: '',
-    role: 'student'
+    role: 'student',
+    mssv: ''
   });
 
   // 1. TẢI DANH SÁCH TÀI KHOẢN TỪ BACKEND
@@ -63,6 +65,10 @@ export function UsersManagement() {
     // Validation cơ bản
     if (!formData.name.trim() || !formData.email.trim()) {
       toast.error('Vui lòng điền đầy đủ Họ tên và Email');
+      return;
+    }
+    if (formData.role === 'student' && !formData.mssv.trim()) {
+      toast.error('Vui lòng nhập MSSV cho tài khoản học sinh');
       return;
     }
     if (!editingUser && (!formData.password || formData.password.length < 6)) {
@@ -111,7 +117,7 @@ export function UsersManagement() {
 
   const handleEdit = (user: UserData) => {
     setEditingUser(user);
-    setFormData({ name: user.name, email: user.email, password: '', role: user.role });
+    setFormData({ name: user.name, email: user.email, password: '', role: user.role, mssv: user.mssv || '' });
     setIsAddDialogOpen(true);
   };
 
@@ -169,6 +175,7 @@ export function UsersManagement() {
                 <TableRow>
                   <TableHead className="font-bold text-gray-700">Họ và tên</TableHead>
                   <TableHead className="font-bold text-gray-700">Email đăng nhập</TableHead>
+                  <TableHead className="font-bold text-gray-700">MSSV</TableHead>
                   <TableHead className="font-bold text-gray-700">Phân quyền</TableHead>
                   <TableHead className="font-bold text-gray-700">Ngày tạo</TableHead>
                   <TableHead className="font-bold text-gray-700 text-right">Thao tác</TableHead>
@@ -193,6 +200,7 @@ export function UsersManagement() {
                     <TableRow key={u.id} className="hover:bg-gray-50/50 transition-colors">
                       <TableCell className="font-semibold text-gray-900">{u.name}</TableCell>
                       <TableCell className="text-gray-600">{u.email}</TableCell>
+                      <TableCell className="text-gray-600">{u.mssv || 'N/A'}</TableCell>
                       <TableCell>
                         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold ${
                           u.role === 'teacher' || u.role === 'admin' 
@@ -283,6 +291,18 @@ export function UsersManagement() {
                 placeholder="vd: student@stu.edu.vn"
                 disabled={isSubmitting}
                 required
+                className="h-11 border-gray-200"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="font-semibold text-gray-700">MSSV</Label>
+              <Input
+                type="text"
+                value={formData.mssv}
+                onChange={(e) => setFormData({ ...formData, mssv: e.target.value })}
+                placeholder="vd: 21520001"
+                disabled={isSubmitting}
                 className="h-11 border-gray-200"
               />
             </div>

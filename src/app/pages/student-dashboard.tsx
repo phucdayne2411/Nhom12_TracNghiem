@@ -11,12 +11,14 @@ import { toast } from 'sonner';
 interface Exam {
   id: number;
   name: string;
-  subject: string;
+  subject: string | { name?: string } | null;
+  subject_name?: string;
   start_time: string;
   end_time: string;
   duration: number;
   total_questions: number;
   status: 'upcoming' | 'ongoing' | 'completed';
+  is_completed?: boolean;
 }
 
 export function StudentDashboard() {
@@ -27,14 +29,17 @@ export function StudentDashboard() {
 
   // 1. Tải danh sách bài thi từ Backend Render
   const fetchExams = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
+      // Reset exams trước khi fetch để tránh cộng dồn dữ liệu
+      setExams([]);
       // Gọi API lấy danh sách bài thi dành cho sinh viên
       const response = await api.get('/student/exams');
-      setExams(response.data);
+      setExams(response.data || []);
     } catch (error: any) {
       console.error("Lỗi khi tải bài thi:", error);
       toast.error("Không thể tải danh sách bài thi. Vui lòng thử lại!");
+      setExams([]);
     } finally {
       setLoading(false);
     }
@@ -42,9 +47,14 @@ export function StudentDashboard() {
 
   useEffect(() => {
     fetchExams();
+    // Cleanup: Clear exams when component unmounts
+    return () => {
+      setExams([]);
+    };
   }, []);
 
   const handleLogout = async () => {
+    setExams([]); // Clear exams before logout
     await logout();
     navigate('/', { replace: true });
     toast.success("Đã đăng xuất thành công");
@@ -100,7 +110,11 @@ export function StudentDashboard() {
                 <div className="flex justify-between items-start mb-2">
                   <h4 className="font-bold text-gray-900 leading-tight group-hover:text-blue-600 transition-colors">{exam.name}</h4>
                 </div>
-                <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-4">{exam.subject}</p>
+                <p className="text-xs font-bold text-blue-500 uppercase tracking-wider mb-4">
+                  {typeof exam.subject === 'object'
+                    ? exam.subject?.name || exam.subject_name || 'N/A'
+                    : exam.subject || exam.subject_name || 'N/A'}
+                </p>
                 
                 <div className="space-y-2 mb-5">
                   <div className="flex items-center gap-2 text-[13px] text-gray-500">
@@ -113,12 +127,21 @@ export function StudentDashboard() {
                   </div>
                 </div>
 
-                {status === 'ongoing' && (
+                {status === 'ongoing' && !exam.is_completed && (
                   <Button 
                     className="w-full bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20 gap-2 h-10 font-bold"
                     onClick={() => navigate(`/student/waiting-room/${exam.id}`)}
                   >
                     <PlayCircle className="h-4 w-4" /> Làm bài ngay
+                  </Button>
+                )}
+                {status === 'ongoing' && exam.is_completed && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2 border-2 h-10 font-bold hover:bg-gray-50 transition-colors"
+                    onClick={() => navigate(`/student/result/${exam.id}`)}
+                  >
+                    <Eye className="h-4 w-4" /> Đã làm - Xem kết quả
                   </Button>
                 )}
                 {status === 'completed' && (
@@ -188,10 +211,6 @@ export function StudentDashboard() {
           {renderExamColumn('Đã kết thúc', BookOpen, 'text-gray-500', 'completed')}
         </div>
       </main>
-      
-      <footer className="max-w-7xl mx-auto px-6 py-8 border-t text-center text-xs text-gray-400 font-medium uppercase tracking-widest">
-        © 2026 UIT Exam Management System
-      </footer>
     </div>
   );
 }

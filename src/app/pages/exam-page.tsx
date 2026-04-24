@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router-dom';
 // Sử dụng api instance từ context để tự động đính kèm Token
 import { api } from '../context/auth-context'; 
 import { Button } from '../components/ui/button';
@@ -29,12 +29,18 @@ export function ExamPage() {
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tabSwitchCount, setTabSwitchCount] = useState(0);
+  const [showWarning, setShowWarning] = useState(false);
 
   // 1. Tải thông tin đề thi và câu hỏi từ Backend
   useEffect(() => {
     const loadExam = async () => {
       if (!examId) return;
       try {
+        setLoading(true);
+        setAnswers({}); // Reset answers khi load exam mới
+        setCurrentQuestionIndex(0); // Reset question index
+        
         const response = await api.get(`/student/exams/${examId}`);
         const examData = response.data;
         
@@ -52,6 +58,22 @@ export function ExamPage() {
           ]
         }));
         setQuestions(mappedQuestions);
+
+        // Load auto-saved data AFTER questions are loaded
+        const savedData = localStorage.getItem(`exam_${examId}_autosave`);
+        if (savedData) {
+          try {
+            const parsed = JSON.parse(savedData);
+            // Only load if saved within last 24 hours
+            if (Date.now() - parsed.timestamp < 24 * 60 * 60 * 1000) {
+              setAnswers(parsed.answers || {});
+              setCurrentQuestionIndex(parsed.currentQuestionIndex || 0);
+              toast.info('Đã khôi phục dữ liệu từ lần làm gần nhất');
+            }
+          } catch (error) {
+            console.error('Error loading auto-saved data:', error);
+          }
+        }
       } catch (error) {
         console.error('Lỗi tải đề thi:', error);
         toast.error("Không thể tải đề thi. Vui lòng thử lại!");
@@ -62,7 +84,43 @@ export function ExamPage() {
     loadExam();
   }, [examId]);
 
-  // 2. Bộ đếm ngược thời gian
+  // 2. Anti-cheating: Detect tab switching
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        setTabSwitchCount(prev => prev + 1);
+        setShowWarning(true);
+        toast.warning('Cảnh báo: Bạn đã chuyển tab! Điều này có thể ảnh hưởng đến kết quả bài thi.');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  // 3. Auto-save answers to localStorage
+  useEffect(() => {
+    if (Object.keys(answers).length > 0 && examId) {
+      const saveData = {
+        answers,
+        currentQuestionIndex,
+        timestamp: Date.now()
+      };
+      localStorage.setItem(`exam_${examId}_autosave`, JSON.stringify(saveData));
+    }
+  }, [answers, currentQuestionIndex, examId]);
+
+  // 4. Cleanup: Remove auto-saved data when component unmounts
+  useEffect(() => {
+    return () => {
+      if (examId) {
+        // Don't remove on unmount in case user navigates away accidentally
+        // Only remove after successful submission (done in handleSubmit)
+      }
+    };
+  }, [examId]);
+
+  // 5. Bộ đếm ngược thời gian
   useEffect(() => {
     if (!exam || loading || timeLeft <= 0) return;
     const timer = setInterval(() => {
@@ -76,7 +134,7 @@ export function ExamPage() {
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [exam, loading, timeLeft]);
+  }, [exam, loading]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -91,19 +149,30 @@ export function ExamPage() {
     }));
   };
 
-  // 3. Hàm nộp bài lên Backend
+  // 6. Hàm nộp bài lên Backend
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // Gửi mảng các câu trả lời lên server
-      await api.post(`/student/exams/${examId}/submit`, {
-        answers: answers 
-      });
-      toast.success("Nộp bài thành công!");
+      const token = localStorage.getItem('token');
+      const response = await api.post(
+        `/student/exams/${examId}/submit`,
+        { 
+          answers,
+          question_ids: exam.question_ids || questions.map(q => q.id)
+        },
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        }
+      );
+
+      toast.success(response.data.message || "Nộp bài thành công!");
+      // Clear auto-saved data after successful submission
+      localStorage.removeItem(`exam_${examId}_autosave`);
       navigate(`/student/result/${examId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Lỗi nộp bài:", error);
-      toast.error("Lỗi khi gửi bài làm. Vui lòng kiểm tra kết nối!");
+      const message = error?.response?.data?.message || error?.message || "Lỗi khi gửi bài làm. Vui lòng kiểm tra kết nối!";
+      toast.error(message);
     } finally {
       setIsSubmitting(false);
       setShowSubmitDialog(false);
@@ -129,7 +198,11 @@ export function ExamPage() {
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div>
             <h1 className="font-bold text-xl text-blue-700">{exam.name}</h1>
-            <p className="text-sm text-gray-500 uppercase">{exam.subject_name || exam.subject}</p>
+            <p className="text-sm text-gray-500 uppercase">
+              {typeof exam.subject === 'object'
+                ? exam.subject?.name || exam.subject_name || 'N/A'
+                : exam.subject_name || exam.subject || 'N/A'}
+            </p>
           </div>
           <div className="flex items-center gap-6">
             <div className={`flex items-center gap-2 px-4 py-2 rounded-lg border ${timeLeft < 300 ? 'bg-red-50 border-red-200 text-red-600' : 'bg-gray-50 border-gray-200 text-gray-700'}`}>
@@ -224,6 +297,23 @@ export function ExamPage() {
             <Button onClick={handleSubmit} disabled={isSubmitting}>
               {isSubmitting ? "Đang nộp..." : "Xác nhận nộp bài"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog cảnh báo chuyển tab */}
+      <Dialog open={showWarning} onOpenChange={setShowWarning}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Cảnh báo vi phạm quy chế thi!</DialogTitle>
+            <DialogDescription>
+              Hệ thống phát hiện bạn đã chuyển tab hoặc rời khỏi trang thi. 
+              Lần vi phạm: <b>{tabSwitchCount}</b><br/>
+              Việc này có thể ảnh hưởng đến kết quả bài thi của bạn.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setShowWarning(false)}>Tôi hiểu</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
